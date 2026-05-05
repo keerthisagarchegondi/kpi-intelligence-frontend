@@ -1399,6 +1399,462 @@ def create_revenue_growth_combo_chart(height: int = 400) -> go.Figure:
     )
 
 
+def get_churn_prediction_data() -> pd.DataFrame:
+    """
+    Get realistic churn prediction data by customer segment.
+    
+    Returns:
+        DataFrame with segment churn predictions
+    """
+    segments = ['Enterprise', 'Mid-Market', 'Small Business', 'Startup', 'Free Trial']
+    at_risk = [12, 48, 194, 391, 1756]
+    low_risk = [198, 623, 987, 1245, 1523]
+    healthy = [35, 152, 366, 467, 613]
+    
+    return pd.DataFrame({
+        'segment': segments,
+        'high_risk': at_risk,
+        'medium_risk': low_risk,
+        'low_risk': healthy
+    })
+
+
+def get_cohort_retention_data() -> pd.DataFrame:
+    """
+    Get realistic cohort retention data over time.
+    
+    Returns:
+        DataFrame with cohort retention percentages
+    """
+    cohorts = ['Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026', 'May 2026']
+    data = {
+        'Month 0': [100, 100, 100, 100, 100],
+        'Month 1': [85.3, 87.1, 89.2, 90.8, None],
+        'Month 2': [72.4, 75.8, 78.3, None, None],
+        'Month 3': [65.2, 68.9, None, None, None],
+        'Month 4': [60.1, None, None, None, None],
+        'Month 5': [57.3, None, None, None, None]
+    }
+    
+    return pd.DataFrame(data, index=cohorts)
+
+
+def get_retention_trend_data(days: int = 90) -> pd.DataFrame:
+    """
+    Get retention rate trend over time.
+    
+    Args:
+        days: Number of days of data
+    
+    Returns:
+        DataFrame with daily retention metrics
+    """
+    dates = pd.date_range(end=datetime(2026, 5, 2), periods=days, freq='D')
+    
+    retention_rates = []
+    churn_rates = []
+    
+    for i in range(days):
+        # Improving trend with some fluctuation
+        base_retention = 82 + (i * 0.05)
+        seasonal = 2 * np.sin(i / 14 * 2 * np.pi)
+        retention = min(95, base_retention + seasonal + np.random.uniform(-1, 1))
+        
+        retention_rates.append(retention)
+        churn_rates.append(100 - retention)
+    
+    return pd.DataFrame({
+        'date': dates,
+        'retention_rate': retention_rates,
+        'churn_rate': churn_rates
+    })
+
+
+def get_segment_retention_data() -> pd.DataFrame:
+    """
+    Get retention metrics by customer segment.
+    
+    Returns:
+        DataFrame with segment retention data
+    """
+    segments = ['Enterprise', 'Mid-Market', 'Small Business', 'Startup', 'Free Trial']
+    retention_30d = [96.8, 92.4, 87.3, 81.2, 54.7]
+    retention_90d = [92.1, 85.7, 72.8, 65.4, 32.1]
+    avg_ltv = [52000, 18500, 4200, 1850, 0]
+    
+    return pd.DataFrame({
+        'segment': segments,
+        '30_day_retention': retention_30d,
+        '90_day_retention': retention_90d,
+        'avg_ltv': avg_ltv
+    })
+
+
+def get_churn_reasons_data() -> pd.DataFrame:
+    """
+    Get data on reasons for customer churn.
+    
+    Returns:
+        DataFrame with churn reasons and counts
+    """
+    reasons = [
+        'Price Too High',
+        'Poor Product Fit',
+        'Lack of Features',
+        'Customer Service',
+        'Moved to Competitor',
+        'Technical Issues',
+        'Other'
+    ]
+    counts = [145, 98, 87, 65, 112, 43, 56]
+    percentages = [c / sum(counts) * 100 for c in counts]
+    
+    return pd.DataFrame({
+        'reason': reasons,
+        'count': counts,
+        'percentage': percentages
+    })
+
+
+# ==================== RETENTION-SPECIFIC CHARTS ====================
+
+def create_cohort_retention_heatmap(height: int = 500) -> go.Figure:
+    """
+    Create a cohort retention heatmap showing retention rates over time.
+    
+    Args:
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object with cohort heatmap
+    """
+    data = get_cohort_retention_data()
+    
+    # Create heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=data.values,
+        x=data.columns,
+        y=data.index,
+        colorscale=[
+            [0, '#ef5350'],      # Red for low retention
+            [0.5, '#ffa726'],    # Orange for medium
+            [0.7, '#ffee58'],    # Yellow for good
+            [1, '#66bb6a']       # Green for excellent
+        ],
+        text=[[f'{val:.1f}%' if pd.notna(val) else 'N/A' for val in row] for row in data.values],
+        texttemplate='%{text}',
+        textfont={"size": 12},
+        colorbar=dict(
+            title='Retention %',
+            ticksuffix='%'
+        ),
+        hoverongaps=False,
+        hovertemplate='<b>%{y}</b><br>%{x}: %{z:.1f}%<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text='Cohort Retention Analysis',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Months Since First Purchase',
+        yaxis_title='Cohort',
+        height=height,
+        template='plotly_white',
+        margin=dict(l=100, r=120, t=80, b=60)
+    )
+    
+    return fig
+
+
+def create_retention_trend_chart(days: int = 90, height: int = 400) -> go.Figure:
+    """
+    Create a line chart showing retention rate trends over time.
+    
+    Args:
+        days: Number of days of data
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object
+    """
+    data = get_retention_trend_data(days)
+    
+    fig = go.Figure()
+    
+    # Add retention rate line
+    fig.add_trace(go.Scatter(
+        x=data['date'],
+        y=data['retention_rate'],
+        name='Retention Rate',
+        mode='lines+markers',
+        line=dict(color='#66bb6a', width=3),
+        marker=dict(size=4),
+        fill='tozeroy',
+        fillcolor='rgba(102, 187, 106, 0.1)'
+    ))
+    
+    # Add churn rate line
+    fig.add_trace(go.Scatter(
+        x=data['date'],
+        y=data['churn_rate'],
+        name='Churn Rate',
+        mode='lines+markers',
+        line=dict(color='#ef5350', width=2, dash='dash'),
+        marker=dict(size=4)
+    ))
+    
+    # Add target line
+    fig.add_hline(
+        y=85,
+        line_dash="dot",
+        line_color="gray",
+        annotation_text="Target: 85%",
+        annotation_position="right"
+    )
+    
+    fig.update_layout(
+        title=dict(
+            text='Retention & Churn Rate Trends',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Date',
+        yaxis_title='Rate (%)',
+        yaxis=dict(range=[0, 100]),
+        height=height,
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(l=60, r=40, t=100, b=60)
+    )
+    
+    return fig
+
+
+def create_segment_retention_comparison(height: int = 450) -> go.Figure:
+    """
+    Create a grouped bar chart comparing retention across segments.
+    
+    Args:
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object
+    """
+    data = get_segment_retention_data()
+    
+    fig = go.Figure()
+    
+    # Add 30-day retention bars
+    fig.add_trace(go.Bar(
+        x=data['segment'],
+        y=data['30_day_retention'],
+        name='30-Day Retention',
+        marker_color='#42a5f5',
+        text=[f'{val:.1f}%' for val in data['30_day_retention']],
+        textposition='outside'
+    ))
+    
+    # Add 90-day retention bars
+    fig.add_trace(go.Bar(
+        x=data['segment'],
+        y=data['90_day_retention'],
+        name='90-Day Retention',
+        marker_color='#ab47bc',
+        text=[f'{val:.1f}%' for val in data['90_day_retention']],
+        textposition='outside'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text='Retention Rate by Customer Segment',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Customer Segment',
+        yaxis_title='Retention Rate (%)',
+        yaxis=dict(range=[0, 110]),
+        barmode='group',
+        height=height,
+        template='plotly_white',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(l=60, r=40, t=100, b=60)
+    )
+    
+    return fig
+
+
+def create_churn_reasons_chart(height: int = 400) -> go.Figure:
+    """
+    Create a horizontal bar chart showing reasons for churn.
+    
+    Args:
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object
+    """
+    data = get_churn_reasons_data()
+    
+    # Sort by count
+    data = data.sort_values('count', ascending=True)
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        y=data['reason'],
+        x=data['count'],
+        orientation='h',
+        marker=dict(
+            color=data['percentage'],
+            colorscale='Reds',
+            showscale=True,
+            colorbar=dict(title='%')
+        ),
+        text=[f'{count} ({pct:.1f}%)' for count, pct in zip(data['count'], data['percentage'])],
+        textposition='outside',
+        hovertemplate='<b>%{y}</b><br>Count: %{x}<br>Percentage: %{marker.color:.1f}%<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text='Top Reasons for Customer Churn',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Number of Customers',
+        yaxis_title='',
+        height=height,
+        template='plotly_white',
+        showlegend=False,
+        margin=dict(l=150, r=100, t=80, b=60)
+    )
+    
+    return fig
+
+
+def create_churn_risk_distribution(height: int = 400) -> go.Figure:
+    """
+    Create a stacked bar chart showing churn risk distribution by segment.
+    
+    Args:
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object
+    """
+    data = get_churn_prediction_data()
+    
+    fig = go.Figure()
+    
+    # Add stacked bars for each risk level
+    fig.add_trace(go.Bar(
+        x=data['segment'],
+        y=data['high_risk'],
+        name='High Risk',
+        marker_color='#ef5350',
+        text=data['high_risk'],
+        textposition='inside'
+    ))
+    
+    fig.add_trace(go.Bar(
+        x=data['segment'],
+        y=data['medium_risk'],
+        name='Medium Risk',
+        marker_color='#ffa726',
+        text=data['medium_risk'],
+        textposition='inside'
+    ))
+    
+    fig.add_trace(go.Bar(
+        x=data['segment'],
+        y=data['low_risk'],
+        name='Low Risk',
+        marker_color='#66bb6a',
+        text=data['low_risk'],
+        textposition='inside'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text='Customer Churn Risk Distribution',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Customer Segment',
+        yaxis_title='Number of Customers',
+        barmode='stack',
+        height=height,
+        template='plotly_white',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(l=60, r=40, t=100, b=60)
+    )
+    
+    return fig
+
+
+def create_ltv_by_segment_chart(height: int = 400) -> go.Figure:
+    """
+    Create a chart showing customer lifetime value by segment.
+    
+    Args:
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object
+    """
+    data = get_segment_retention_data()
+    
+    # Sort by LTV
+    data = data.sort_values('avg_ltv', ascending=False)
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=data['segment'],
+        y=data['avg_ltv'],
+        marker=dict(
+            color=data['avg_ltv'],
+            colorscale='Viridis',
+            showscale=True,
+            colorbar=dict(title='LTV ($)')
+        ),
+        text=[f'${val:,.0f}' for val in data['avg_ltv']],
+        textposition='outside',
+        hovertemplate='<b>%{x}</b><br>LTV: $%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text='Average Customer Lifetime Value by Segment',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Customer Segment',
+        yaxis_title='Average LTV ($)',
+        height=height,
+        template='plotly_white',
+        showlegend=False,
+        margin=dict(l=60, r=120, t=80, b=60)
+    )
+    
+    return fig
+
+
 def get_all_sample_charts() -> Dict[str, go.Figure]:
     """
     Generate all sample charts with realistic data for demonstration purposes.
@@ -1416,6 +1872,12 @@ def get_all_sample_charts() -> Dict[str, go.Figure]:
         'activity_heatmap': create_activity_heatmap_chart(),
         'satisfaction_gauge': create_customer_satisfaction_gauge(),
         'mrr_indicator': create_mrr_indicator(),
-        'revenue_growth_combo': create_revenue_growth_combo_chart()
+        'revenue_growth_combo': create_revenue_growth_combo_chart(),
+        'cohort_retention_heatmap': create_cohort_retention_heatmap(),
+        'retention_trend': create_retention_trend_chart(),
+        'segment_retention': create_segment_retention_comparison(),
+        'churn_reasons': create_churn_reasons_chart(),
+        'churn_risk': create_churn_risk_distribution(),
+        'ltv_by_segment': create_ltv_by_segment_chart()
     }
 
