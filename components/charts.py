@@ -1855,6 +1855,423 @@ def create_ltv_by_segment_chart(height: int = 400) -> go.Figure:
     return fig
 
 
+# ==================== PRODUCT KPI CHARTS ====================
+
+def create_product_performance_overview(
+    data: pd.DataFrame,
+    top_n: int = 10,
+    height: int = 500
+) -> go.Figure:
+    """
+    Create comprehensive product performance overview chart.
+    
+    Args:
+        data: DataFrame with product performance data
+        top_n: Number of top products to display
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object with product performance visualization
+    """
+    # Get top N products by revenue
+    top_products = data.nlargest(top_n, 'total_revenue')
+    
+    fig = go.Figure()
+    
+    # Add revenue bars
+    fig.add_trace(go.Bar(
+        x=top_products['product'],
+        y=top_products['total_revenue'],
+        name='Revenue',
+        marker_color='#42a5f5',
+        text=[f'${val/1000:.1f}K' for val in top_products['total_revenue']],
+        textposition='outside',
+        yaxis='y',
+        hovertemplate='<b>%{x}</b><br>Revenue: $%{y:,.2f}<extra></extra>'
+    ))
+    
+    # Add profit margin line on secondary axis
+    fig.add_trace(go.Scatter(
+        x=top_products['product'],
+        y=top_products['profit_margin'],
+        name='Profit Margin %',
+        mode='lines+markers',
+        line=dict(color='#66bb6a', width=3),
+        marker=dict(size=8),
+        yaxis='y2',
+        hovertemplate='<b>%{x}</b><br>Margin: %{y:.1f}%<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text=f'Top {top_n} Products by Revenue & Profit Margin',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Product',
+        yaxis=dict(
+            title='Total Revenue ($)',
+            side='left'
+        ),
+        yaxis2=dict(
+            title='Profit Margin (%)',
+            side='right',
+            overlaying='y',
+            range=[0, max(top_products['profit_margin']) * 1.2]
+        ),
+        height=height,
+        template='plotly_white',
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(l=60, r=60, t=100, b=120)
+    )
+    
+    # Rotate x-axis labels for better readability
+    fig.update_xaxes(tickangle=-45)
+    
+    return fig
+
+
+def create_product_category_distribution(
+    data: pd.DataFrame,
+    height: int = 400
+) -> go.Figure:
+    """
+    Create pie chart showing revenue distribution by product category.
+    
+    Args:
+        data: DataFrame with product performance data
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object with category distribution
+    """
+    # Aggregate by category
+    category_data = data.groupby('category').agg({
+        'total_revenue': 'sum',
+        'total_quantity': 'sum'
+    }).reset_index()
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Pie(
+        labels=category_data['category'],
+        values=category_data['total_revenue'],
+        hole=0.4,
+        marker=dict(
+            colors=px.colors.qualitative.Set3,
+            line=dict(color='white', width=2)
+        ),
+        textinfo='label+percent',
+        textposition='outside',
+        hovertemplate='<b>%{label}</b><br>Revenue: $%{value:,.2f}<br>Share: %{percent}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text='Revenue Distribution by Product Category',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        height=height,
+        template='plotly_white',
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.05
+        ),
+        margin=dict(l=40, r=150, t=80, b=40)
+    )
+    
+    return fig
+
+
+def create_product_profitability_matrix(
+    data: pd.DataFrame,
+    height: int = 500
+) -> go.Figure:
+    """
+    Create bubble chart showing product profitability (Revenue vs Profit Margin).
+    
+    Args:
+        data: DataFrame with product performance data
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object with profitability matrix
+    """
+    fig = go.Figure()
+    
+    # Create bubble chart
+    fig.add_trace(go.Scatter(
+        x=data['total_revenue'],
+        y=data['profit_margin'],
+        mode='markers+text',
+        marker=dict(
+            size=data['transaction_count'] / 2,  # Size based on transaction volume
+            color=data['roi'],
+            colorscale='Viridis',
+            showscale=True,
+            colorbar=dict(title='ROI %'),
+            line=dict(color='white', width=1)
+        ),
+        text=data['product'],
+        textposition='top center',
+        textfont=dict(size=9),
+        hovertemplate='<b>%{text}</b><br>' +
+                     'Revenue: $%{x:,.2f}<br>' +
+                     'Profit Margin: %{y:.1f}%<br>' +
+                     'ROI: %{marker.color:.1f}%<extra></extra>'
+    ))
+    
+    # Add quadrant lines
+    median_revenue = data['total_revenue'].median()
+    median_margin = data['profit_margin'].median()
+    
+    fig.add_vline(x=median_revenue, line_dash="dash", line_color="gray", opacity=0.5)
+    fig.add_hline(y=median_margin, line_dash="dash", line_color="gray", opacity=0.5)
+    
+    # Add quadrant annotations
+    max_revenue = data['total_revenue'].max()
+    max_margin = data['profit_margin'].max()
+    
+    annotations = [
+        dict(x=median_revenue + (max_revenue - median_revenue) / 2, 
+             y=median_margin + (max_margin - median_margin) / 2,
+             text="Stars<br>(High Revenue, High Margin)", showarrow=False, 
+             font=dict(color="green", size=10), opacity=0.7),
+        dict(x=median_revenue / 2, 
+             y=median_margin + (max_margin - median_margin) / 2,
+             text="Question Marks<br>(Low Revenue, High Margin)", showarrow=False,
+             font=dict(color="orange", size=10), opacity=0.7),
+        dict(x=median_revenue + (max_revenue - median_revenue) / 2,
+             y=median_margin / 2,
+             text="Cash Cows<br>(High Revenue, Low Margin)", showarrow=False,
+             font=dict(color="blue", size=10), opacity=0.7),
+        dict(x=median_revenue / 2,
+             y=median_margin / 2,
+             text="Dogs<br>(Low Revenue, Low Margin)", showarrow=False,
+             font=dict(color="red", size=10), opacity=0.7)
+    ]
+    
+    fig.update_layout(
+        title=dict(
+            text='Product Profitability Matrix',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Total Revenue ($)',
+        yaxis_title='Profit Margin (%)',
+        height=height,
+        template='plotly_white',
+        annotations=annotations,
+        margin=dict(l=60, r=40, t=80, b=60)
+    )
+    
+    return fig
+
+
+def create_product_roi_ranking(
+    data: pd.DataFrame,
+    top_n: int = 10,
+    height: int = 400
+) -> go.Figure:
+    """
+    Create horizontal bar chart showing top products by ROI.
+    
+    Args:
+        data: DataFrame with product performance data
+        top_n: Number of top products to display
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object with ROI ranking
+    """
+    # Get top N products by ROI
+    top_roi = data.nlargest(top_n, 'roi').sort_values('roi', ascending=True)
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        y=top_roi['product'],
+        x=top_roi['roi'],
+        orientation='h',
+        marker=dict(
+            color=top_roi['roi'],
+            colorscale='RdYlGn',
+            showscale=True,
+            colorbar=dict(title='ROI %')
+        ),
+        text=[f'{val:.1f}%' for val in top_roi['roi']],
+        textposition='outside',
+        hovertemplate='<b>%{y}</b><br>ROI: %{x:.1f}%<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text=f'Top {top_n} Products by Return on Investment',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='ROI (%)',
+        yaxis_title='',
+        height=height,
+        template='plotly_white',
+        showlegend=False,
+        margin=dict(l=150, r=100, t=80, b=60)
+    )
+    
+    return fig
+
+
+def create_product_quantity_revenue_comparison(
+    data: pd.DataFrame,
+    top_n: int = 10,
+    height: int = 450
+) -> go.Figure:
+    """
+    Create grouped bar chart comparing quantity sold vs revenue.
+    
+    Args:
+        data: DataFrame with product performance data
+        top_n: Number of products to display
+        height: Chart height in pixels
+    
+    Returns:
+        Plotly Figure object with quantity-revenue comparison
+    """
+    # Get top N products by revenue
+    top_products = data.nlargest(top_n, 'total_revenue')
+    
+    fig = go.Figure()
+    
+    # Normalize values for better comparison
+    max_quantity = top_products['total_quantity'].max()
+    max_revenue = top_products['total_revenue'].max()
+    
+    # Add quantity bars (normalized)
+    fig.add_trace(go.Bar(
+        x=top_products['product'],
+        y=top_products['total_quantity'],
+        name='Quantity Sold',
+        marker_color='#ffa726',
+        text=top_products['total_quantity'],
+        textposition='outside',
+        yaxis='y',
+        hovertemplate='<b>%{x}</b><br>Quantity: %{y:,}<extra></extra>'
+    ))
+    
+    # Add revenue bars on secondary axis
+    fig.add_trace(go.Bar(
+        x=top_products['product'],
+        y=top_products['total_revenue'],
+        name='Revenue ($)',
+        marker_color='#42a5f5',
+        text=[f'${val/1000:.0f}K' for val in top_products['total_revenue']],
+        textposition='outside',
+        yaxis='y2',
+        hovertemplate='<b>%{x}</b><br>Revenue: $%{y:,.2f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(
+            text='Product Performance: Quantity vs Revenue',
+            font=dict(size=20, family="Arial, sans-serif")
+        ),
+        xaxis_title='Product',
+        yaxis=dict(
+            title='Quantity Sold',
+            side='left'
+        ),
+        yaxis2=dict(
+            title='Revenue ($)',
+            side='right',
+            overlaying='y'
+        ),
+        barmode='group',
+        height=height,
+        template='plotly_white',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(l=60, r=60, t=100, b=120)
+    )
+    
+    fig.update_xaxes(tickangle=-45)
+    
+    return fig
+
+
+def create_product_kpi_summary_cards(
+    kpi_data: Dict
+) -> Dict[str, go.Figure]:
+    """
+    Create KPI indicator cards for product metrics.
+    
+    Args:
+        kpi_data: Dictionary with product KPI data from API
+    
+    Returns:
+        Dictionary of Plotly figures for each KPI
+    """
+    summary = kpi_data.get('summary', {})
+    
+    cards = {}
+    
+    # Total Revenue Card
+    cards['total_revenue'] = create_indicator_card(
+        value=summary.get('total_revenue', 0),
+        title='Total Product Revenue',
+        previous_value=summary.get('total_revenue', 0) / (1 + summary.get('revenue_growth', 15) / 100),
+        units='$',
+        height=180
+    )
+    
+    # Total Profit Card
+    cards['total_profit'] = create_indicator_card(
+        value=summary.get('total_profit', 0),
+        title='Total Profit',
+        previous_value=summary.get('total_profit', 0) / (1 + summary.get('profit_growth', 12) / 100),
+        units='$',
+        height=180
+    )
+    
+    # Average Profit Margin Card
+    cards['avg_margin'] = create_gauge_chart(
+        value=summary.get('avg_profit_margin', 0),
+        title='Avg Profit Margin',
+        min_value=0,
+        max_value=100,
+        threshold_low=15,
+        threshold_high=25,
+        units='%',
+        height=180
+    )
+    
+    # Average ROI Card
+    cards['avg_roi'] = create_gauge_chart(
+        value=summary.get('avg_roi', 0),
+        title='Average ROI',
+        min_value=0,
+        max_value=100,
+        threshold_low=20,
+        threshold_high=35,
+        units='%',
+        height=180
+    )
+    
+    return cards
+
+
 def get_all_sample_charts() -> Dict[str, go.Figure]:
     """
     Generate all sample charts with realistic data for demonstration purposes.
