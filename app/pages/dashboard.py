@@ -41,9 +41,18 @@ from services.api import (
     fetch_dashboard_metrics,
     fetch_revenue_data,
     fetch_customer_data,
+    fetch_anomalies,
+    upload_file,
     is_backend_available,
     display_connection_status,
     load_data_with_fallback
+)
+
+# Import alerts component
+from components.alerts import (
+    display_compact_anomaly_banner,
+    display_anomaly_alerts,
+    create_anomaly_settings_sidebar
 )
 
 # Page configuration
@@ -100,6 +109,109 @@ st.markdown("---")
 
 # Display backend connection status
 display_connection_status()
+
+# ==================== ANOMALY ALERTS SECTION ====================
+st.markdown("### 🚨 Anomaly Detection & Alerts")
+
+# Create two columns: alerts and upload
+alert_col, upload_col = st.columns([2, 1])
+
+with alert_col:
+    # Fetch and display anomalies
+    with st.spinner("Checking for anomalies..."):
+        try:
+            anomalies_data = fetch_anomalies(
+                metric="revenue",
+                method="zscore",
+                threshold=3.0,
+                period="30d",
+                limit=10,
+                use_cache=True
+            )
+            
+            if anomalies_data and anomalies_data.get('status') == 'success':
+                display_compact_anomaly_banner(anomalies_data)
+                
+                # Show details in expander
+                with st.expander("📊 View Detailed Anomaly Report", expanded=False):
+                    display_anomaly_alerts(anomalies_data, show_details=True)
+            else:
+                st.info("✅ No anomalies detected. System operating normally.")
+        
+        except Exception as e:
+            st.warning(f"⚠️ Unable to fetch anomaly data: {str(e)}")
+
+with upload_col:
+    st.markdown("#### 📤 Upload Data File")
+    
+    uploaded_file = st.file_uploader(
+        "Upload CSV, Excel, or Parquet",
+        type=['csv', 'xlsx', 'xls', 'parquet', 'json'],
+        help="Upload data files for processing and analysis (max 50MB)",
+        key="dashboard_upload"
+    )
+    
+    if uploaded_file is not None:
+        # Show upload options
+        with st.expander("⚙️ Upload Options", expanded=True):
+            process_data = st.checkbox("Process & Clean Data", value=True)
+            save_raw = st.checkbox("Save Original File", value=True)
+            save_processed = st.checkbox("Save Processed File", value=True)
+            validate = st.checkbox("Validate Schema", value=True)
+            
+            if st.button("🚀 Upload File", type="primary"):
+                with st.spinner(f"Uploading {uploaded_file.name}..."):
+                    try:
+                        # Read file content
+                        file_content = uploaded_file.read()
+                        
+                        # Upload to backend
+                        result = upload_file(
+                            file_content=file_content,
+                            filename=uploaded_file.name,
+                            process_data=process_data,
+                            save_to_raw=save_raw,
+                            save_to_processed=save_processed,
+                            validate_schema=validate
+                        )
+                        
+                        if result and result.get('status') == 'success':
+                            st.success(f"✅ {result['message']}")
+                            
+                            # Display upload details
+                            file_info = result.get('file_info', {})
+                            st.info(
+                                f"📁 **File:** {file_info.get('filename', 'N/A')}  \n"
+                                f"📊 **Size:** {file_info.get('file_size_mb', 0):.2f} MB  \n"
+                                f"📋 **Rows:** {file_info.get('rows', 0):,}  \n"
+                                f"📏 **Columns:** {file_info.get('columns', 0)}  \n"
+                                f"⏱️ **Processing Time:** {result.get('processing_time_seconds', 0):.2f}s"
+                            )
+                            
+                            # Show validation results if any
+                            validation = result.get('validation_results', {})
+                            if validation:
+                                if validation.get('has_errors'):
+                                    st.error(f"❌ Validation Errors: {', '.join(validation.get('errors', []))}")
+                                elif validation.get('has_warnings'):
+                                    st.warning(f"⚠️ Warnings: {', '.join(validation.get('warnings', []))}")
+                                else:
+                                    st.success("✅ All validations passed!")
+                            
+                            # Show processing summary
+                            if process_data and 'processing_summary' in result:
+                                summary = result['processing_summary']
+                                if summary and 'actions' in summary:
+                                    with st.expander("🔧 Processing Actions", expanded=False):
+                                        for action in summary['actions']:
+                                            st.text(f"• {action}")
+                        else:
+                            st.error("❌ Upload failed. Please check the file and try again.")
+                    
+                    except Exception as e:
+                        st.error(f"❌ Upload error: {str(e)}")
+
+st.markdown("---")
 
 # Main dashboard content
 if filters_applied:

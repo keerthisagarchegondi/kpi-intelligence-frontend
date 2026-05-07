@@ -424,3 +424,107 @@ def load_data_with_fallback(
         if show_status:
             st.warning(f"⚠️ Error loading {data_name}: {str(e)}. Using sample data.")
         return fallback_function()
+
+
+# ==================== ANOMALY DETECTION ====================
+
+def fetch_anomalies(
+    metric: str = "revenue",
+    method: str = "zscore",
+    threshold: float = 3.0,
+    period: str = "30d",
+    limit: int = 10,
+    use_cache: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Fetch detected anomalies from backend.
+    
+    Args:
+        metric: Metric to analyze (revenue, profit, transactions)
+        method: Detection method (zscore, iqr, mad, moving_avg)
+        threshold: Anomaly detection threshold
+        period: Time period (7d, 30d, 90d)
+        limit: Maximum anomalies to return
+        use_cache: Whether to use cached results
+    
+    Returns:
+        Dictionary with anomalies, summary, and alerts or None on error
+    """
+    params = {
+        "metric": metric,
+        "method": method,
+        "threshold": threshold,
+        "period": period,
+        "limit": limit
+    }
+    
+    return api_client.get("/anomalies/detect", params=params, use_cache=use_cache)
+
+
+# ==================== FILE UPLOAD ====================
+
+def upload_file(
+    file_content: bytes,
+    filename: str,
+    process_data: bool = True,
+    save_to_raw: bool = True,
+    save_to_processed: bool = True,
+    validate_schema: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Upload data file to backend for processing.
+    
+    Args:
+        file_content: File content as bytes
+        filename: Original filename
+        process_data: Whether to process and clean data
+        save_to_raw: Save original file to raw directory
+        save_to_processed: Save processed file to processed directory
+        validate_schema: Perform schema validation
+    
+    Returns:
+        Upload response with file info, validation results, and saved paths
+    """
+    try:
+        url = f"{api_client.api_url}/upload"
+        
+        files = {
+            'file': (filename, file_content)
+        }
+        
+        data = {
+            'process_data': str(process_data).lower(),
+            'save_to_raw': str(save_to_raw).lower(),
+            'save_to_processed': str(save_to_processed).lower(),
+            'validate_schema': str(validate_schema).lower()
+        }
+        
+        response = requests.post(
+            url,
+            files=files,
+            data=data,
+            timeout=api_client.timeout * 3  # Longer timeout for upload
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 400:
+            error = response.json().get('detail', 'Upload validation failed')
+            st.error(f"Upload Error: {error}")
+            return None
+        elif response.status_code == 413:
+            st.error("File too large. Maximum size: 50 MB")
+            return None
+        else:
+            st.error(f"Upload failed: {response.status_code}")
+            return None
+    
+    except requests.exceptions.Timeout:
+        st.error("Upload timeout. Please try a smaller file.")
+        return None
+    except requests.exceptions.ConnectionError:
+        st.error("Cannot connect to backend. Please ensure server is running.")
+        return None
+    except Exception as e:
+        st.error(f"Upload failed: {str(e)}")
+        return None
