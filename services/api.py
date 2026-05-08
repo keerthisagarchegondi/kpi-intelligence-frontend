@@ -528,3 +528,436 @@ def upload_file(
     except Exception as e:
         st.error(f"Upload failed: {str(e)}")
         return None
+
+
+# ==================== COMPREHENSIVE KPI DATA FETCHING ====================
+
+def fetch_kpi_overview(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    use_cache: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Fetch comprehensive KPI overview with all metrics.
+    
+    Args:
+        start_date: Start date (YYYY-MM-DD format)
+        end_date: End date (YYYY-MM-DD format)
+        use_cache: Use cached data if available
+    
+    Returns:
+        Dictionary with comprehensive KPI metrics including:
+        - Revenue metrics (total, average, growth)
+        - Customer metrics (total, active, retention)
+        - Product metrics (top products, categories)
+        - Sales metrics (conversion rate, AOV)
+        - Period comparison data
+    """
+    params = {}
+    if start_date:
+        params['start_date'] = start_date
+    if end_date:
+        params['end_date'] = end_date
+    
+    response = api_client.get("kpi/overview", params=params, use_cache=use_cache)
+    
+    if response and response.get('status') == 'success':
+        return response['data']
+    
+    return None
+
+
+def fetch_kpi_by_category(
+    category: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    use_cache: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Fetch KPIs filtered by specific category.
+    
+    Args:
+        category: Category name (e.g., 'revenue', 'sales', 'customer', 'product')
+        start_date: Start date (YYYY-MM-DD format)
+        end_date: End date (YYYY-MM-DD format)
+        use_cache: Use cached data if available
+    
+    Returns:
+        Dictionary with category-specific KPI metrics
+    """
+    params = {'category': category}
+    if start_date:
+        params['start_date'] = start_date
+    if end_date:
+        params['end_date'] = end_date
+    
+    response = api_client.get(f"kpi/category/{category}", params=params, use_cache=use_cache)
+    
+    if response and response.get('status') == 'success':
+        return response['data']
+    
+    return None
+
+
+def fetch_kpi_time_series(
+    metrics: List[str],
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    granularity: str = "daily",
+    use_cache: bool = True
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch KPI time series data for trend analysis.
+    
+    Args:
+        metrics: List of metric names to fetch (e.g., ['revenue', 'orders', 'customers'])
+        start_date: Start date (YYYY-MM-DD format)
+        end_date: End date (YYYY-MM-DD format)
+        granularity: Time granularity ('daily', 'weekly', 'monthly')
+        use_cache: Use cached data if available
+    
+    Returns:
+        DataFrame with time series data for requested metrics
+    """
+    params = {
+        'metrics': ','.join(metrics),
+        'granularity': granularity
+    }
+    if start_date:
+        params['start_date'] = start_date
+    if end_date:
+        params['end_date'] = end_date
+    
+    response = api_client.get("kpi/timeseries", params=params, use_cache=use_cache)
+    
+    if response and response.get('status') == 'success':
+        return pd.DataFrame(response['data'])
+    
+    return None
+
+
+def fetch_all_reports(use_cache: bool = True) -> Optional[List[Dict[str, Any]]]:
+    """
+    Fetch list of all available reports with metadata.
+    
+    Args:
+        use_cache: Use cached data if available
+    
+    Returns:
+        List of report metadata including:
+        - Report ID and name
+        - Description
+        - Available columns
+        - Last updated timestamp
+        - Row count estimate
+    """
+    response = api_client.get("reports/list", use_cache=use_cache)
+    
+    if response and response.get('status') == 'success':
+        return response['data']
+    
+    return None
+
+
+def fetch_report_data(
+    report_id: str,
+    filters: Optional[Dict[str, Any]] = None,
+    sort_by: Optional[str] = None,
+    sort_order: str = "asc",
+    page: int = 1,
+    page_size: int = 100,
+    use_cache: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Fetch report data with advanced filtering, sorting, and pagination.
+    
+    Args:
+        report_id: Unique report identifier
+        filters: Dictionary of filter conditions (e.g., {'status': 'active', 'category': 'electronics'})
+        sort_by: Column name to sort by
+        sort_order: Sort order ('asc' or 'desc')
+        page: Page number for pagination (1-indexed)
+        page_size: Number of records per page
+        use_cache: Use cached data if available
+    
+    Returns:
+        Dictionary with:
+        - data: DataFrame with report data
+        - total_records: Total number of records
+        - page_info: Pagination information
+        - applied_filters: Active filters
+        - columns: Column definitions
+    """
+    params = {
+        'page': page,
+        'page_size': page_size,
+        'sort_order': sort_order
+    }
+    
+    if sort_by:
+        params['sort_by'] = sort_by
+    
+    if filters:
+        # Encode filters as JSON string
+        import json
+        params['filters'] = json.dumps(filters)
+    
+    response = api_client.get(f"reports/{report_id}", params=params, use_cache=use_cache)
+    
+    if response and response.get('status') == 'success':
+        # Convert data array to DataFrame
+        data = response['data']
+        if 'records' in data:
+            data['data'] = pd.DataFrame(data['records'])
+        return data
+    
+    return None
+
+
+def fetch_kpi_comparison(
+    metrics: List[str],
+    period1_start: str,
+    period1_end: str,
+    period2_start: str,
+    period2_end: str,
+    use_cache: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Compare KPI metrics between two time periods.
+    
+    Args:
+        metrics: List of metric names to compare
+        period1_start: Start date of first period (YYYY-MM-DD)
+        period1_end: End date of first period (YYYY-MM-DD)
+        period2_start: Start date of second period (YYYY-MM-DD)
+        period2_end: End date of second period (YYYY-MM-DD)
+        use_cache: Use cached data if available
+    
+    Returns:
+        Dictionary with comparison metrics including:
+        - period1_values: Metrics for first period
+        - period2_values: Metrics for second period
+        - changes: Absolute and percentage changes
+        - trend: Trend direction (up/down/flat)
+    """
+    params = {
+        'metrics': ','.join(metrics),
+        'period1_start': period1_start,
+        'period1_end': period1_end,
+        'period2_start': period2_start,
+        'period2_end': period2_end
+    }
+    
+    response = api_client.get("kpi/compare", params=params, use_cache=use_cache)
+    
+    if response and response.get('status') == 'success':
+        return response['data']
+    
+    return None
+
+
+def fetch_top_performers(
+    metric: str = "revenue",
+    dimension: str = "product",
+    limit: int = 10,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    use_cache: bool = True
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch top performers by specific metric and dimension.
+    
+    Args:
+        metric: Metric to rank by (revenue, profit, quantity, growth)
+        dimension: Dimension to analyze (product, customer, region, category)
+        limit: Number of top performers to return
+        start_date: Start date (YYYY-MM-DD format)
+        end_date: End date (YYYY-MM-DD format)
+        use_cache: Use cached data if available
+    
+    Returns:
+        DataFrame with top performers and their metrics
+    """
+    params = {
+        'metric': metric,
+        'dimension': dimension,
+        'limit': limit
+    }
+    if start_date:
+        params['start_date'] = start_date
+    if end_date:
+        params['end_date'] = end_date
+    
+    response = api_client.get("kpi/top-performers", params=params, use_cache=use_cache)
+    
+    if response and response.get('status') == 'success':
+        return pd.DataFrame(response['data'])
+    
+    return None
+
+
+# ==================== SAMPLE DATA GENERATORS FOR FALLBACK ====================
+
+def generate_sample_kpi_overview() -> Dict[str, Any]:
+    """Generate realistic sample KPI overview data for demo/fallback"""
+    from datetime import datetime, timedelta
+    import random
+    
+    today = datetime.now()
+    
+    return {
+        'period': {
+            'start_date': (today - timedelta(days=30)).strftime('%Y-%m-%d'),
+            'end_date': today.strftime('%Y-%m-%d')
+        },
+        'revenue': {
+            'total': 1245680.50,
+            'average_daily': 41522.68,
+            'growth_rate': 12.5,
+            'trend': 'up'
+        },
+        'customers': {
+            'total': 15420,
+            'active': 12850,
+            'new': 2340,
+            'retention_rate': 85.2,
+            'churn_rate': 14.8
+        },
+        'sales': {
+            'total_orders': 8920,
+            'average_order_value': 139.65,
+            'conversion_rate': 3.45,
+            'items_per_order': 2.8
+        },
+        'products': {
+            'total_products': 450,
+            'active_products': 398,
+            'top_category': 'Electronics',
+            'low_stock_items': 23
+        }
+    }
+
+
+def generate_sample_report_list() -> List[Dict[str, Any]]:
+    """Generate sample list of available reports"""
+    return [
+        {
+            'report_id': 'sales_overview',
+            'name': 'Sales Overview Report',
+            'description': 'Comprehensive sales data with product details and customer information',
+            'row_count': 8920,
+            'columns': ['order_id', 'date', 'customer', 'product', 'quantity', 'revenue', 'profit'],
+            'last_updated': datetime.now().isoformat()
+        },
+        {
+            'report_id': 'product_performance',
+            'name': 'Product Performance Report',
+            'description': 'Detailed product analytics including revenue, units sold, and margins',
+            'row_count': 450,
+            'columns': ['product_id', 'product_name', 'category', 'revenue', 'units_sold', 'profit_margin'],
+            'last_updated': datetime.now().isoformat()
+        },
+        {
+            'report_id': 'customer_analytics',
+            'name': 'Customer Analytics Report',
+            'description': 'Customer behavior, lifetime value, and segmentation data',
+            'row_count': 15420,
+            'columns': ['customer_id', 'name', 'segment', 'lifetime_value', 'orders_count', 'last_purchase'],
+            'last_updated': datetime.now().isoformat()
+        },
+        {
+            'report_id': 'revenue_breakdown',
+            'name': 'Revenue Breakdown Report',
+            'description': 'Revenue analysis by product, region, and time period',
+            'row_count': 2840,
+            'columns': ['date', 'region', 'category', 'revenue', 'cost', 'profit', 'margin'],
+            'last_updated': datetime.now().isoformat()
+        }
+    ]
+
+
+def generate_sample_report_data(report_id: str, page_size: int = 100) -> Dict[str, Any]:
+    """Generate realistic sample report data for demo/fallback"""
+    import random
+    from datetime import datetime, timedelta
+    
+    # Generate sample records based on report type
+    if report_id == 'sales_overview':
+        records = []
+        products = ['Laptop Pro', 'Wireless Mouse', 'USB-C Cable', 'Monitor 27"', 'Keyboard RGB']
+        customers = [f'Customer-{i:04d}' for i in range(1, 101)]
+        
+        for i in range(page_size):
+            date = datetime.now() - timedelta(days=random.randint(0, 30))
+            records.append({
+                'order_id': f'ORD-{10000 + i}',
+                'date': date.strftime('%Y-%m-%d'),
+                'customer': random.choice(customers),
+                'product': random.choice(products),
+                'quantity': random.randint(1, 5),
+                'revenue': round(random.uniform(50, 500), 2),
+                'profit': round(random.uniform(10, 150), 2),
+                'status': random.choice(['Completed', 'Pending', 'Shipped'])
+            })
+    
+    elif report_id == 'product_performance':
+        categories = ['Electronics', 'Accessories', 'Components', 'Peripherals']
+        records = []
+        
+        for i in range(page_size):
+            revenue = random.uniform(5000, 50000)
+            units = random.randint(100, 1000)
+            records.append({
+                'product_id': f'PROD-{1000 + i}',
+                'product_name': f'Product {i+1}',
+                'category': random.choice(categories),
+                'revenue': round(revenue, 2),
+                'units_sold': units,
+                'profit_margin': round(random.uniform(15, 45), 2),
+                'stock_level': random.randint(0, 500)
+            })
+    
+    elif report_id == 'customer_analytics':
+        segments = ['VIP', 'Regular', 'New', 'Inactive']
+        records = []
+        
+        for i in range(page_size):
+            records.append({
+                'customer_id': f'CUST-{5000 + i}',
+                'name': f'Customer {i+1}',
+                'segment': random.choice(segments),
+                'lifetime_value': round(random.uniform(500, 10000), 2),
+                'orders_count': random.randint(1, 50),
+                'last_purchase': (datetime.now() - timedelta(days=random.randint(0, 180))).strftime('%Y-%m-%d'),
+                'email': f'customer{i+1}@example.com'
+            })
+    
+    else:  # revenue_breakdown
+        regions = ['North', 'South', 'East', 'West']
+        categories = ['Electronics', 'Accessories', 'Components']
+        records = []
+        
+        for i in range(page_size):
+            revenue = random.uniform(1000, 20000)
+            cost = revenue * random.uniform(0.4, 0.7)
+            records.append({
+                'date': (datetime.now() - timedelta(days=random.randint(0, 90))).strftime('%Y-%m-%d'),
+                'region': random.choice(regions),
+                'category': random.choice(categories),
+                'revenue': round(revenue, 2),
+                'cost': round(cost, 2),
+                'profit': round(revenue - cost, 2),
+                'margin': round((revenue - cost) / revenue * 100, 2)
+            })
+    
+    return {
+        'records': records,
+        'total_records': page_size * 10,  # Simulate more data exists
+        'page_info': {
+            'current_page': 1,
+            'page_size': page_size,
+            'total_pages': 10
+        },
+        'applied_filters': {},
+        'columns': list(records[0].keys()) if records else []
+    }
