@@ -9,6 +9,7 @@ Features:
 - Export capabilities
 - Interactive visualizations
 - Drill-down analysis
+- Loading states and error handling
 """
 
 import streamlit as st
@@ -35,6 +36,26 @@ from components.tables import (
 
 from components.filters import render_date_range_filter
 
+# Import loading and error components
+from components.loading import (
+    loading_spinner,
+    show_loading_card,
+    show_data_loading_placeholder,
+    show_skeleton_loader,
+    LoadingState
+)
+
+from components.errors import (
+    error_handler,
+    show_error_message,
+    show_error_card,
+    handle_api_error,
+    ErrorMessage,
+    ErrorCategory,
+    ErrorSeverity,
+    safe_execute
+)
+
 # Import API service
 from services.api import (
     fetch_kpi_overview,
@@ -45,7 +66,8 @@ from services.api import (
     generate_sample_report_list,
     generate_sample_report_data,
     display_connection_status,
-    load_data_with_fallback
+    load_data_with_fallback,
+    APIStatus
 )
 
 # Page configuration
@@ -200,34 +222,226 @@ with st.sidebar:
 
 # Main content area
 def load_report_data(report_type: str) -> pd.DataFrame:
-    """Load data based on selected report type"""
+    """Load data based on selected report type with loading and error handling"""
     
-    if "Sales" in report_type:
-        # Try to fetch from API, fallback to sample data
-        try:
-            data = fetch_report_data('sales_overview', page_size=500)
-            if data and 'data' in data:
-                df = data['data']
-            else:
-                sample_data = generate_sample_report_data('sales_overview', page_size=200)
-                df = pd.DataFrame(sample_data['records'])
-        except:
-            sample_data = generate_sample_report_data('sales_overview', page_size=200)
-            df = pd.DataFrame(sample_data['records'])
+    # Show loading state
+    with loading_spinner(f"Loading {report_type}...", key=f"load_{report_type}"):
+        if "Sales" in report_type:
+            # Try to fetch from API with error handling
+            df = safe_execute(
+                lambda: _load_sales_data(),
+                error_message="Failed to load sales data",
+                default_return=pd.DataFrame(generate_sample_report_data('sales_overview', page_size=200)['records']),
+                show_error=False
+            )
+            
+            # Apply filters
+            if 'status_filter' in st.session_state and hasattr(st.session_state, 'status_filter'):
+                status_filter = st.session_state.get('status_filter', [])
+                if status_filter and 'status' in df.columns:
+                    df = df[df['status'].isin(status_filter)]
+            
+            if 'min_revenue' in st.session_state:
+                min_revenue = st.session_state.get('min_revenue', 0)
+                if min_revenue > 0 and 'revenue' in df.columns:
+                    df = df[df['revenue'] >= min_revenue]
         
-        # Apply filters
-        if 'status_filter' in locals() and status_filter:
-            df = df[df['status'].isin(status_filter)]
-        if 'min_revenue' in locals() and min_revenue > 0:
-            df = df[df['revenue'] >= min_revenue]
+        elif "Product" in report_type:
+            df = safe_execute(
+                lambda: _load_product_data(),
+                error_message="Failed to load product data",
+                default_return=pd.DataFrame(generate_sample_report_data('product_performance', page_size=150)['records']),
+                show_error=False
+            )
+            
+            # Apply filters
+            if 'category_filter' in st.session_state:
+                category_filter = st.session_state.get('category_filter', [])
+                if category_filter and 'category' in df.columns:
+                    df = df[df['category'].isin(category_filter)]
+            
+            if 'min_stock' in st.session_state:
+                min_stock = st.session_state.get('min_stock', 0)
+                if min_stock > 0 and 'stock_level' in df.columns:
+                    df = df[df['stock_level'] >= min_stock]
+        
+        elif "Customer" in report_type:
+            df = safe_execute(
+                lambda: _load_customer_data(),
+                error_message="Failed to load customer data",
+                default_return=pd.DataFrame(generate_sample_report_data('customer_analytics', page_size=200)['records']),
+                show_error=False
+            )
+            
+            # Apply filters
+            if 'segment_filter' in st.session_state:
+                segment_filter = st.session_state.get('segment_filter', [])
+                if segment_filter and 'segment' in df.columns:
+                    df = df[df['segment'].isin(segment_filter)]
+            
+            if 'min_ltv' in st.session_state:
+                min_ltv = st.session_state.get('min_ltv', 0)
+                if min_ltv > 0 and 'lifetime_value' in df.columns:
+                    df = df[df['lifetime_value'] >= min_ltv]
+        
+        elif "Revenue" in report_type:
+            df = safe_execute(
+                lambda: _load_revenue_data(),
+                error_message="Failed to load revenue data",
+                default_return=pd.DataFrame(generate_sample_report_data('revenue_breakdown', page_size=180)['records']),
+                show_error=False
+            )
+            
+            # Apply filters
+            if 'region_filter' in st.session_state:
+                region_filter = st.session_state.get('region_filter', [])
+                if region_filter and 'region' in df.columns:
+                    df = df[df['region'].isin(region_filter)]
+        
+        elif "Top Performers" in report_type:
+            df = safe_execute(
+                lambda: _load_top_performers_data(),
+                error_message="Failed to load top performers data",
+                default_return=pd.DataFrame(generate_sample_report_data('product_performance', page_size=50)['records']).sort_values('revenue', ascending=False),
+                show_error=False
+            )
+        
+        else:  # KPI Summary
+            kpi_data = safe_execute(
+                lambda: _load_kpi_summary_data(),
+                error_message="Failed to load KPI summary",
+                default_return=generate_sample_kpi_overview(),
+                show_error=False
+            )
+            
+            # Convert KPI data to DataFrame
+            records = []
+            for category, metrics in kpi_data.items():
+                if isinstance(metrics, dict) and category != 'period':
+                    for metric, value in metrics.items():
+                        records.append({
+                            'Category': category.capitalize(),
+                            'Metric': metric.replace('_', ' ').title(),
+                            'Value': value
+                        })
+            
+            df = pd.DataFrame(records)
     
-    elif "Product" in report_type:
-        try:
-            data = fetch_report_data('product_performance', page_size=500)
-            if data and 'data' in data:
-                df = data['data']
-            else:
-                sample_data = generate_sample_report_data('product_performance', page_size=150)
+    return df
+
+
+# Helper functions for data loading
+def _load_sales_data() -> pd.DataFrame:
+    """Load sales data from API or fallback"""
+    data = fetch_report_data('sales_overview', page_size=500)
+    if data and 'data' in data:
+        return data['data']
+    else:
+        sample_data = generate_sample_report_data('sales_overview', page_size=200)
+        return pd.DataFrame(sample_data['records'])
+
+
+def _load_product_data() -> pd.DataFrame:
+    """Load product data from API or fallback"""
+    data = fetch_report_data('product_performance', page_size=500)
+    if data and 'data' in data:
+        return data['data']
+    else:
+        sample_data = generate_sample_report_data('product_performance', page_size=150)
+        return pd.DataFrame(sample_data['records'])
+
+
+def _load_customer_data() -> pd.DataFrame:
+    """Load customer data from API or fallback"""
+    data = fetch_report_data('customer_analytics', page_size=500)
+    if data and 'data' in data:
+        return data['data']
+    else:
+        sample_data = generate_sample_report_data('customer_analytics', page_size=200)
+        return pd.DataFrame(sample_data['records'])
+
+
+def _load_revenue_data() -> pd.DataFrame:
+    """Load revenue data from API or fallback"""
+    data = fetch_report_data('revenue_breakdown', page_size=500)
+    if data and 'data' in data:
+        return data['data']
+    else:
+        sample_data = generate_sample_report_data('revenue_breakdown', page_size=180)
+        return pd.DataFrame(sample_data['records'])
+
+
+def _load_top_performers_data() -> pd.DataFrame:
+    """Load top performers data from API or fallback"""
+    start_date = st.session_state.get('start_date', datetime.now() - timedelta(days=30))
+    end_date = st.session_state.get('end_date', datetime.now())
+    
+    df = fetch_top_performers(
+        metric='revenue',
+        dimension='product',
+        limit=50,
+        start_date=start_date.strftime('%Y-%m-%d') if hasattr(start_date, 'strftime') else str(start_date),
+        end_date=end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
+    )
+    
+    if df is None:
+        sample_data = generate_sample_report_data('product_performance', page_size=50)
+        df = pd.DataFrame(sample_data['records']).sort_values('revenue', ascending=False)
+    
+    return df
+
+
+def _load_kpi_summary_data() -> dict:
+    """Load KPI summary data from API or fallback"""
+    start_date = st.session_state.get('start_date', datetime.now() - timedelta(days=30))
+    end_date = st.session_state.get('end_date', datetime.now())
+    
+    kpi_data = fetch_kpi_overview(
+        start_date=start_date.strftime('%Y-%m-%d') if hasattr(start_date, 'strftime') else str(start_date),
+        end_date=end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
+    )
+    
+    if kpi_data is None:
+        kpi_data = generate_sample_kpi_overview()
+    
+    return kpi_data
+
+
+# Load data with error boundary
+def load_report_data_safe(report_type: str) -> pd.DataFrame:
+    """Safe wrapper for load_report_data with error boundary"""
+    try:
+        return load_report_data(report_type)
+    except Exception as e:
+        error_msg = error_handler.handle_error(e, context="Loading report data", show_ui=True)
+        # Return empty dataframe as fallback
+        return pd.DataFrame()
+
+
+# ==================== MAIN CONTENT AREA ====================
+
+# Load data
+try:
+    with st.spinner("Loading report data..."):
+        report_data = load_report_data_safe(report_type)
+except Exception as e:
+    show_error_card(
+        title="Failed to Load Report",
+        message="Unable to load the requested report data.",
+        suggestions=[
+            "Try refreshing the page",
+            "Check your internet connection",
+            "Select a different report type"
+        ],
+        show_retry=True,
+        retry_callback=lambda: st.rerun(),
+        key="report_load_error"
+    )
+    report_data = pd.DataFrame()
+
+
+# Display report-specific content
+if not report_data.empty:
                 df = pd.DataFrame(sample_data['records'])
         except:
             sample_data = generate_sample_report_data('product_performance', page_size=150)

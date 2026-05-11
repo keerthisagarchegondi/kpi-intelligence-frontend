@@ -10,6 +10,7 @@ Production-level reusable table components with advanced features:
 - Row selection
 - Conditional formatting
 - Responsive design
+- Loading states
 """
 
 import streamlit as st
@@ -43,7 +44,8 @@ def create_interactive_table(
     custom_formatters: Optional[Dict[str, Callable]] = None,
     conditional_formatting: Optional[Dict[str, Callable]] = None,
     summary_stats: bool = False,
-    frozen_columns: Optional[List[str]] = None
+    frozen_columns: Optional[List[str]] = None,
+    show_loading: bool = False
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     Create a production-level interactive data table with advanced features.
@@ -63,10 +65,26 @@ def create_interactive_table(
         conditional_formatting: Conditional styling rules
         summary_stats: Show summary statistics
         frozen_columns: Columns to keep visible when scrolling
+        show_loading: Show loading state
     
     Returns:
         Tuple of (filtered_dataframe, metadata_dict)
     """
+    
+    # Show loading state if data is being processed
+    if show_loading or data is None or data.empty:
+        with st.spinner("Loading table data..."):
+            if data is None or data.empty:
+                st.warning("⚠️ No data available to display")
+                return pd.DataFrame(), {
+                    'total_rows': 0,
+                    'filtered_rows': 0,
+                    'displayed_rows': 0,
+                    'current_page': 0,
+                    'total_pages': 0,
+                    'visible_columns': [],
+                    'search_query': ''
+                }
     
     # Initialize session state
     if f'{key_prefix}_page' not in st.session_state:

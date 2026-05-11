@@ -7,14 +7,25 @@ Production-level service for connecting to backend API with:
 - Response caching
 - Timeout management
 - Graceful fallback to sample data
+- Loading states and error messages
 """
 
 import requests
-from typing import Optional, Dict, List, Any, Union
+from typing import Optional, Dict, List, Any, Union, Tuple
 from datetime import datetime, timedelta
 import streamlit as st
 import pandas as pd
 import time
+
+
+class APIStatus:
+    """Track API request status"""
+    SUCCESS = "success"
+    ERROR = "error"
+    TIMEOUT = "timeout"
+    NETWORK_ERROR = "network_error"
+    NOT_FOUND = "not_found"
+    SERVER_ERROR = "server_error"
 
 
 class APIConfig:
@@ -86,9 +97,9 @@ class APIClient:
         method: str = "GET",
         params: Optional[Dict] = None,
         data: Optional[Dict] = None
-    ) -> Optional[Dict]:
+    ) -> Tuple[Optional[Dict], str, Optional[str]]:
         """
-        Make HTTP request with retry logic.
+        Make HTTP request with retry logic and detailed error information.
         
         Args:
             endpoint: API endpoint (without base URL)
@@ -97,9 +108,10 @@ class APIClient:
             data: Request body data
         
         Returns:
-            Response JSON or None on failure
+            Tuple of (Response JSON or None, status, error_message)
         """
         url = f"{self.api_url}/{endpoint.lstrip('/')}"
+        last_error = None
         
         for attempt in range(self.max_retries):
             try:
@@ -117,82 +129,117 @@ class APIClient:
                         timeout=self.timeout
                     )
                 else:
-                    raise ValueError(f"Unsupported HTTP method: {method}")
+                    return None, APIStatus.ERROR, f"Unsupported HTTP method: {method}"
                 
-                # Raise exception for bad status codes
+                # Check status code
+                if response.status_code == 404:
+                    return None, APIStatus.NOT_FOUND, f"Endpoint not found: {endpoint}"
+                elif response.status_code >= 500:
+                    return None, APIStatus.SERVER_ERROR, f"Server error (status {response.status_code})"
+                
+                # Raise exception for other bad status codes
                 response.raise_for_status()
                 
-                return response.json()
+                return response.json(), APIStatus.SUCCESS, None
             
-            except requests.exceptions.Timeout:
+            except requests.exceptions.Timeout as e:
+                last_error = f"Request timeout: {str(e)}"
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (attempt + 1))
                     continue
-                print(f"Request timeout after {self.max_retries} attempts: {url}")
-                return None
+                return None, APIStatus.TIMEOUT, last_error
             
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.ConnectionError as e:
+                last_error = f"Connection error: {str(e)}"
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (attempt + 1))
                     continue
-                print(f"Connection error after {self.max_retries} attempts: {url}")
-                return None
+                return None, APIStatus.NETWORK_ERROR, last_error
             
             except requests.exceptions.RequestException as e:
-                print(f"Request error: {str(e)}")
-                return None
+                last_error = f"Request error: {str(e)}"
+                return None, APIStatus.ERROR, last_error
+            
+            except Exception as e:
+                last_error = f"Unexpected error: {str(e)}"
+                return None, APIStatus.ERROR, last_error
         
-        return None
+        return None, APIStatus.ERROR, last_error
     
     def get(
         self,
         endpoint: str,
         params: Optional[Dict] = None,
-        use_cache: bool = True
-    ) -> Optional[Dict]:
+        use_cache: bool = True,
+        show_error: bool = False
+    ) -> Tuple[Optional[Dict], str, Optional[str]]:
         """
-        Make GET request with caching support.
+        Make GET request with caching support and error handling.
         
         Args:
             endpoint: API endpoint
             params: Query parameters
             use_cache: Whether to use cached response
+            show_error: Whether to display error in UI
         
         Returns:
-            Response data or None
+            Tuple of (Response data or None, status, error_message)
         """
         # Check cache first
         if use_cache:
             cache_key = self._get_cache_key(endpoint, params)
             cached_data = self._get_from_cache(cache_key)
             if cached_data is not None:
-                return cached_data
+                return cached_data, APIStatus.SUCCESS, None
         
         # Make request
-        response = self._make_request(endpoint, method="GET", params=params)
+        response, status, error_msg = self._make_request(endpoint, method="GET", params=params)
+        
+        # Show error in UI if requested
+        if show_error and status != APIStatus.SUCCESS:
+            self._display_error(status, error_msg, endpoint)
         
         # Cache successful response
-        if response and use_cache:
+        if response and use_cache and status == APIStatus.SUCCESS:
             cache_key = self._get_cache_key(endpoint, params)
             self._save_to_cache(cache_key, response)
         
-        return response
+        return response, status, error_msg
     
-    def check_health(self) -> bool:
+    def _display_error(self, status: str, error_msg: Optional[str], endpoint: str):
+        """Display error message in Streamlit UI"""
+        if status == APIStatus.TIMEOUT:
+            st.warning(f"⏱️ Request timeout for {endpoint}. The server might be busy. Using fallback data.")
+        elif status == APIStatus.NETWORK_ERROR:
+            st.warning(f"🌐 Network error connecting to {endpoint}. Check your connection. Using fallback data.")
+        elif status == APIStatus.NOT_FOUND:
+            st.error(f"❌ Endpoint not found: {endpoint}")
+        elif status == APIStatus.SERVER_ERROR:
+            st.error(f"🚨 Server error for {endpoint}. The backend encountered an issue. Using fallback data.")
+        elif error_msg:
+            st.error(f"❌ Error: {error_msg}")
+    
+    def check_health(self) -> Tuple[bool, Optional[str]]:
         """
         Check if backend API is healthy.
         
         Returns:
-            True if API is accessible, False otherwise
+            Tuple of (is_healthy, error_message)
         """
         try:
             response = requests.get(
                 f"{self.api_url}/health",
                 timeout=5
             )
-            return response.status_code == 200
-        except:
-            return False
+            if response.status_code == 200:
+                return True, None
+            return False, f"Server returned status {response.status_code}"
+        except requests.exceptions.Timeout:
+            return False, "Connection timeout"
+        except requests.exceptions.ConnectionError:
+            return False, "Cannot connect to server"
+        except Exception as e:
+            return False, str(e)
     
     def clear_cache(self):
         """Clear all cached API responses"""
@@ -203,23 +250,56 @@ class APIClient:
 api_client = APIClient()
 
 
+# ==================== UTILITY FUNCTIONS ====================
+
+def is_backend_available() -> Tuple[bool, Optional[str]]:
+    """
+    Check if backend API is available.
+    
+    Returns:
+        Tuple of (is_available, error_message)
+    """
+    return api_client.check_health()
+
+
+def display_connection_status(show_success: bool = False):
+    """
+    Display connection status banner in Streamlit UI.
+    
+    Args:
+        show_success: Whether to show success message when connected
+    """
+    is_available, error_msg = api_client.check_health()
+    
+    if is_available:
+        if show_success:
+            st.success(f"🟢 Connected to backend API: {api_client.base_url}")
+    else:
+        if error_msg:
+            st.warning(f"🟡 Backend API unavailable ({error_msg}). Using sample data for demonstration.")
+        else:
+            st.warning(f"🟡 Backend API unavailable. Using sample data for demonstration.")
+
+
 # ==================== DATA FETCHING FUNCTIONS ====================
 
 def fetch_product_performance(
     limit: Optional[int] = None,
     category: Optional[str] = None,
-    use_cache: bool = True
-) -> Optional[pd.DataFrame]:
+    use_cache: bool = True,
+    show_errors: bool = False
+) -> Tuple[Optional[pd.DataFrame], str]:
     """
-    Fetch product performance data from backend.
+    Fetch product performance data from backend with error handling.
     
     Args:
         limit: Maximum number of products to return
         category: Filter by category
         use_cache: Use cached data if available
+        show_errors: Whether to display errors in UI
     
     Returns:
-        DataFrame with product performance data or None
+        Tuple of (DataFrame or None, status_code)
     """
     params = {}
     if limit:
@@ -227,37 +307,51 @@ def fetch_product_performance(
     if category:
         params['category'] = category
     
-    response = api_client.get("products/performance", params=params, use_cache=use_cache)
+    response, status, error_msg = api_client.get(
+        "products/performance",
+        params=params,
+        use_cache=use_cache,
+        show_error=show_errors
+    )
     
     if response and response.get('status') == 'success':
-        return pd.DataFrame(response['data'])
+        return pd.DataFrame(response['data']), status
     
-    return None
+    return None, status
 
 
-def fetch_product_kpi(use_cache: bool = True) -> Optional[Dict]:
+def fetch_product_kpi(
+    use_cache: bool = True,
+    show_errors: bool = False
+) -> Tuple[Optional[Dict], str]:
     """
     Fetch aggregated product KPI metrics.
     
     Args:
         use_cache: Use cached data if available
+        show_errors: Whether to display errors in UI
     
     Returns:
-        Dictionary with product KPIs or None
+        Tuple of (Dictionary with product KPIs or None, status)
     """
-    response = api_client.get("products/kpi", use_cache=use_cache)
+    response, status, error_msg = api_client.get(
+        "products/kpi",
+        use_cache=use_cache,
+        show_error=show_errors
+    )
     
     if response and response.get('status') == 'success':
-        return response['data']
+        return response['data'], status
     
-    return None
+    return None, status
 
 
 def fetch_sales_summary(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    use_cache: bool = True
-) -> Optional[Dict]:
+    use_cache: bool = True,
+    show_errors: bool = False
+) -> Tuple[Optional[Dict], str]:
     """
     Fetch sales summary data.
     
@@ -265,9 +359,10 @@ def fetch_sales_summary(
         start_date: Start date (YYYY-MM-DD)
         end_date: End date (YYYY-MM-DD)
         use_cache: Use cached data if available
+        show_errors: Whether to display errors in UI
     
     Returns:
-        Dictionary with sales summary or None
+        Tuple of (Dictionary with sales summary or None, status)
     """
     params = {}
     if start_date:
@@ -275,35 +370,50 @@ def fetch_sales_summary(
     if end_date:
         params['end_date'] = end_date
     
-    response = api_client.get("sales/summary", params=params, use_cache=use_cache)
+    response, status, error_msg = api_client.get(
+        "sales/summary",
+        params=params,
+        use_cache=use_cache,
+        show_error=show_errors
+    )
     
     if response and response.get('status') == 'success':
-        return response['data']
+        return response['data'], status
     
-    return None
+    return None, status
 
 
-def fetch_dashboard_metrics(use_cache: bool = True) -> Optional[Dict]:
+def fetch_dashboard_metrics(
+    use_cache: bool = True,
+    show_errors: bool = False
+) -> Tuple[Optional[Dict], str]:
     """
     Fetch comprehensive dashboard metrics.
     
     Args:
         use_cache: Use cached data if available
+        show_errors: Whether to display errors in UI
     
     Returns:
-        Dictionary with all dashboard metrics or None
+        Tuple of (Dictionary with all dashboard metrics or None, status)
     """
-    response = api_client.get("dashboard/metrics", use_cache=use_cache)
+    response, status, error_msg = api_client.get(
+        "dashboard/metrics",
+        use_cache=use_cache,
+        show_error=show_errors
+    )
     
     if response and response.get('status') == 'success':
-        return response['data']
+        return response['data'], status
     
-    return None
+    return None, status
 
 
 def fetch_revenue_data(
     period: str = "30d",
-    use_cache: bool = True
+    use_cache: bool = True,
+    show_errors: bool = False
+) -> Tuple[Optional[pd.DataFrame], str]:
 ) -> Optional[pd.DataFrame]:
     """
     Fetch revenue time-series data.
