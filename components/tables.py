@@ -11,6 +11,7 @@ Production-level reusable table components with advanced features:
 - Conditional formatting
 - Responsive design
 - Loading states
+- Performance optimization
 """
 
 import streamlit as st
@@ -20,6 +21,7 @@ from typing import Optional, List, Dict, Any, Callable, Tuple
 from datetime import datetime
 import io
 import base64
+from utils.performance import performance_timer, LazyLoader, DataOptimizer, QueryOptimizer
 
 
 class DataTableConfig:
@@ -30,6 +32,7 @@ class DataTableConfig:
     SEARCH_DEBOUNCE_MS = 300
 
 
+@performance_timer("table_creation")
 def create_interactive_table(
     data: pd.DataFrame,
     key_prefix: str = "table",
@@ -70,6 +73,10 @@ def create_interactive_table(
     Returns:
         Tuple of (filtered_dataframe, metadata_dict)
     """
+    
+    # Optimize data types for better performance
+    if len(data) > 100:
+        data = DataOptimizer.optimize_dtypes(data)
     
     # Show loading state if data is being processed
     if show_loading or data is None or data.empty:

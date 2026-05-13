@@ -1,7 +1,7 @@
 """
 Utils Package
 
-Utilities for data processing, export, and analysis.
+Utilities for data processing, export, analysis, and performance optimization.
 """
 
 from .export import (
@@ -19,6 +19,22 @@ from .data_processing import (
     DataAggregator
 )
 
+from .performance import (
+    PerformanceMonitor,
+    performance_timer,
+    performance_context,
+    CacheManager,
+    cache_manager,
+    memoize,
+    LazyLoader,
+    DataOptimizer,
+    RenderOptimizer,
+    QueryOptimizer,
+    debounce,
+    get_performance_report,
+    display_performance_metrics
+)
+
 __all__ = [
     'DataExporter',
     'DataValidator',
@@ -28,5 +44,18 @@ __all__ = [
     'DataCleaner',
     'DataTransformer',
     'KPICalculator',
-    'DataAggregator'
+    'DataAggregator',
+    'PerformanceMonitor',
+    'performance_timer',
+    'performance_context',
+    'CacheManager',
+    'cache_manager',
+    'memoize',
+    'LazyLoader',
+    'DataOptimizer',
+    'RenderOptimizer',
+    'QueryOptimizer',
+    'debounce',
+    'get_performance_report',
+    'display_performance_metrics'
 ]

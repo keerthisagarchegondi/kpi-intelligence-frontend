@@ -8,6 +8,7 @@ Production-level service for connecting to backend API with:
 - Timeout management
 - Graceful fallback to sample data
 - Loading states and error messages
+- Performance monitoring and optimization
 """
 
 import requests
@@ -16,6 +17,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 import pandas as pd
 import time
+from utils.performance import performance_timer, DataOptimizer
 
 
 class APIStatus:
@@ -166,6 +168,7 @@ class APIClient:
         
         return None, APIStatus.ERROR, last_error
     
+    @performance_timer("api_get_request")
     def get(
         self,
         endpoint: str,
@@ -283,6 +286,8 @@ def display_connection_status(show_success: bool = False):
 
 # ==================== DATA FETCHING FUNCTIONS ====================
 
+@st.cache_data(ttl=300, show_spinner="Loading product performance...")
+@performance_timer("fetch_product_performance")
 def fetch_product_performance(
     limit: Optional[int] = None,
     category: Optional[str] = None,
@@ -642,6 +647,8 @@ def upload_file(
 
 # ==================== COMPREHENSIVE KPI DATA FETCHING ====================
 
+@st.cache_data(ttl=300, show_spinner="Loading KPI overview...")
+@performance_timer("fetch_kpi_overview")
 def fetch_kpi_overview(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
