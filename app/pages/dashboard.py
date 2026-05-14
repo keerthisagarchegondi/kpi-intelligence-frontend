@@ -55,6 +55,9 @@ from components.alerts import (
     create_anomaly_settings_sidebar
 )
 
+# Import upload validation utilities
+from utils.upload import display_upload_widget
+
 # Page configuration
 st.set_page_config(
     page_title="Dashboard - KPI Intelligence",
@@ -142,41 +145,18 @@ with alert_col:
             st.warning(f"⚠️ Unable to fetch anomaly data: {str(e)}")
 
 with upload_col:
-    st.markdown("#### 📤 Upload Data File")
-    
-    uploaded_file = st.file_uploader(
-        "Upload CSV, Excel, or Parquet",
-        type=['csv', 'xlsx', 'xls', 'parquet', 'json'],
-        help="Upload data files for processing and analysis (max 50MB)",
-        key="dashboard_upload"
+    # Use production-level upload widget with validation
+    result = display_upload_widget(
+        key="dashboard_upload",
+        title="📤 Upload Data File",
+        accept_multiple=False,
+        show_options=True
     )
     
-    if uploaded_file is not None:
-        # Show upload options
-        with st.expander("⚙️ Upload Options", expanded=True):
-            process_data = st.checkbox("Process & Clean Data", value=True)
-            save_raw = st.checkbox("Save Original File", value=True)
-            save_processed = st.checkbox("Save Processed File", value=True)
-            validate = st.checkbox("Validate Schema", value=True)
-            
-            if st.button("🚀 Upload File", type="primary"):
-                with st.spinner(f"Uploading {uploaded_file.name}..."):
-                    try:
-                        # Read file content
-                        file_content = uploaded_file.read()
-                        
-                        # Upload to backend
-                        result = upload_file(
-                            file_content=file_content,
-                            filename=uploaded_file.name,
-                            process_data=process_data,
-                            save_to_raw=save_raw,
-                            save_to_processed=save_processed,
-                            validate_schema=validate
-                        )
-                        
-                        if result and result.get('status') == 'success':
-                            st.success(f"✅ {result['message']}")
+    # Display upload results
+    if result:
+        if result.get('status') == 'success':
+            st.success(f"✅ {result['message']}")
                             
                             # Display upload details
                             file_info = result.get('file_info', {})

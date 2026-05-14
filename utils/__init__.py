@@ -1,7 +1,7 @@
 """
 Utils Package
 
-Utilities for data processing, export, analysis, and performance optimization.
+Utilities for data processing, export, analysis, performance optimization, and file uploads.
 """
 
 from .export import (
@@ -35,6 +35,14 @@ from .performance import (
     display_performance_metrics
 )
 
+from .upload import (
+    UploadConfig,
+    UploadValidator,
+    UploadProgressTracker,
+    validate_and_upload,
+    display_upload_widget
+)
+
 __all__ = [
     'DataExporter',
     'DataValidator',
@@ -57,5 +65,10 @@ __all__ = [
     'QueryOptimizer',
     'debounce',
     'get_performance_report',
-    'display_performance_metrics'
+    'display_performance_metrics',
+    'UploadConfig',
+    'UploadValidator',
+    'UploadProgressTracker',
+    'validate_and_upload',
+    'display_upload_widget'
 ]
