@@ -16,7 +16,11 @@ services:
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
       - STREAMLIT_SERVER_HEADLESS=true
       - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-      - BACKEND_API_URL=http://backend:8000
+      - BACKEND_URL=http://backend:8000
+      - API_VERSION=v1
+      - ENVIRONMENT=production
+      - TIMEOUT=15
+      - MAX_RETRIES=3
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

@@ -14,10 +14,27 @@ echo "Streamlit version: $(streamlit --version)"
 echo "Working directory: $(pwd)"
 echo "User: $(whoami)"
 
-# Check if backend API is reachable (optional)
-if [ -n "$BACKEND_API_URL" ]; then
-    echo "Checking backend connectivity at $BACKEND_API_URL..."
-    # Add health check logic here if needed
+# Check if backend API is reachable
+if [ -n "$BACKEND_URL" ]; then
+    echo "Checking backend connectivity at $BACKEND_URL..."
+    
+    # Wait for backend to be available (with timeout)
+    timeout=30
+    elapsed=0
+    while [ $elapsed -lt $timeout ]; do
+        if curl -f -s "$BACKEND_URL/api/v1/health" > /dev/null 2>&1; then
+            echo "✓ Backend API is reachable"
+            break
+        else
+            echo "⏳ Waiting for backend API... ($elapsed/$timeout)"
+            sleep 2
+            elapsed=$((elapsed + 2))
+        fi
+    done
+    
+    if [ $elapsed -ge $timeout ]; then
+        echo "⚠️  Backend API not reachable after ${timeout}s. Starting anyway (will use sample data)"
+    fi
 fi
 
 # Create necessary directories

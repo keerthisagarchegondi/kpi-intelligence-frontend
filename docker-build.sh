@@ -32,7 +32,9 @@ run_prod() {
         -p 8501:8501 \
         -v $(pwd)/data:/app/data \
         -v $(pwd)/logs:/app/logs \
-        -e BACKEND_API_URL=http://localhost:8000 \
+        -e BACKEND_URL=http://localhost:8000 \
+        -e API_VERSION=v1 \
+        -e ENVIRONMENT=production \
         kpi-intelligence-frontend:latest
     echo -e "${GREEN}✓ Container started on http://localhost:8501${NC}"
 }
@@ -44,7 +46,9 @@ run_dev() {
         --name kpi-frontend-dev \
         -p 8501:8501 \
         -v $(pwd):/app \
-        -e BACKEND_API_URL=http://localhost:8000 \
+        -e BACKEND_URL=http://localhost:8000 \
+        -e API_VERSION=v1 \
+        -e ENVIRONMENT=development \
         kpi-intelligence-frontend:dev
     echo -e "${GREEN}✓ Dev container started on http://localhost:8501${NC}"
 }

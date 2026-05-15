@@ -9,6 +9,7 @@ Production-level service for connecting to backend API with:
 - Graceful fallback to sample data
 - Loading states and error messages
 - Performance monitoring and optimization
+- Environment-based configuration
 """
 
 import requests
@@ -18,6 +19,7 @@ import streamlit as st
 import pandas as pd
 import time
 from utils.performance import performance_timer, DataOptimizer
+from services.config import ConfigManager
 
 
 class APIStatus:
@@ -31,8 +33,23 @@ class APIStatus:
 
 
 class APIConfig:
-    """Configuration for API connection"""
-    BASE_URL = "http://localhost:8000"
+    """Configuration for API connection - loaded from environment"""
+    
+    @staticmethod
+    def get_base_url() -> str:
+        """Get base URL from configuration"""
+        return ConfigManager.get_backend_url()
+    
+    @staticmethod
+    def get_config():
+        """Get full configuration"""
+        return ConfigManager.load_config()
+    
+    # Legacy support - dynamically loaded
+    @property
+    def BASE_URL(self) -> str:
+        return self.get_base_url()
+    
     API_VERSION = "v1"
     TIMEOUT = 10  # seconds
     MAX_RETRIES = 3
@@ -49,20 +66,22 @@ class APIClient:
     - Response caching using Streamlit session state
     - Comprehensive error handling
     - Fallback to sample data on connection failure
+    - Environment-based configuration
     """
     
-    def __init__(self, base_url: str = APIConfig.BASE_URL):
+    def __init__(self, base_url: Optional[str] = None):
         """
         Initialize API client.
         
         Args:
-            base_url: Backend API base URL
+            base_url: Backend API base URL (default: from environment config)
         """
-        self.base_url = base_url
-        self.api_url = f"{base_url}/api/{APIConfig.API_VERSION}"
-        self.timeout = APIConfig.TIMEOUT
-        self.max_retries = APIConfig.MAX_RETRIES
-        self.retry_delay = APIConfig.RETRY_DELAY
+        config = ConfigManager.load_config()
+        self.base_url = base_url or config.backend_url
+        self.api_url = f"{self.base_url}/api/{config.api_version}"
+        self.timeout = config.timeout
+        self.max_retries = config.max_retries
+        self.retry_delay = config.retry_delay
         
         # Initialize cache in session state
         if 'api_cache' not in st.session_state:
