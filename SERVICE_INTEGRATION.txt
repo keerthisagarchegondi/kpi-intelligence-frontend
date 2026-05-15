@@ -1,0 +1,181 @@
+"""
+Service Integration Quick Reference
+
+Quick guide for using the service integration features.
+"""
+
+# Service Integration Overview
+
+## Configuration
+
+### Environment Variables
+Set these in .env file or as environment variables:
+
+- BACKEND_URL: Backend API URL (e.g., http://localhost:8000)
+- API_VERSION: API version (default: v1)
+- TIMEOUT: Request timeout in seconds (default: 10)
+- MAX_RETRIES: Maximum retry attempts (default: 3)
+- RETRY_DELAY: Delay between retries (default: 1)
+- CACHE_TTL: Cache time-to-live (default: 300)
+- ENVIRONMENT: Environment name (development/production)
+
+### Configuration Files
+
+1. Copy .env.template to .env
+2. Edit .env with your settings
+3. For production, use .env.production as reference
+
+## Usage
+
+### In Your Code
+
+```python
+from services.config import ConfigManager
+
+# Get configuration
+config = ConfigManager.load_config()
+print(f"Backend URL: {config.backend_url}")
+
+# Check environment
+if ConfigManager.is_production():
+    print("Running in production")
+```
+
+### Integration Verification
+
+```python
+from services.integration import APIIntegrationVerifier
+
+# Quick health check
+verifier = APIIntegrationVerifier()
+is_healthy, error = verifier.run_quick_check()
+
+if is_healthy:
+    print("API is healthy")
+else:
+    print(f"API error: {error}")
+
+# Full integration test
+results = verifier.run_all_tests()
+print(f"Passed: {results['passed']}/{results['total_tests']}")
+```
+
+### Service Monitoring
+
+```python
+from services.monitor import ServiceInitializer, ServiceMonitor
+
+# Initialize services
+status = ServiceInitializer.initialize()
+
+# Get health metrics
+metrics = ServiceMonitor.get_health_metrics()
+print(f"API Status: {metrics['api_status']}")
+```
+
+## Service Status Page
+
+Access the Service Status page from the sidebar navigation:
+- View configuration
+- Run health checks
+- Execute integration tests
+- Monitor API performance
+
+## Setup Script
+
+Run the automated setup:
+
+```bash
+./setup.sh          # Setup without tests
+./setup.sh --test   # Setup with integration tests
+```
+
+## Docker Deployment
+
+### Using Docker Compose
+
+```bash
+# Start services
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f frontend
+
+# Stop services
+docker-compose down
+```
+
+### Using Docker directly
+
+```bash
+# Build
+docker build -t kpi-frontend:latest .
+
+# Run
+docker run -d \
+  -p 8501:8501 \
+  -e BACKEND_URL=http://backend:8000 \
+  -e ENVIRONMENT=production \
+  --name kpi-frontend \
+  kpi-frontend:latest
+```
+
+## Troubleshooting
+
+### API Not Reachable
+
+1. Check backend service is running
+2. Verify BACKEND_URL in .env
+3. Test manually: curl http://localhost:8000/api/v1/health
+4. Check network connectivity
+5. Review backend logs
+
+### Configuration Errors
+
+1. Run setup.sh to validate configuration
+2. Check Service Status page for validation results
+3. Ensure all required environment variables are set
+
+### Integration Test Failures
+
+1. Visit Service Status page
+2. Run full integration tests
+3. Check failed test details
+4. Verify backend endpoints are implemented
+5. Check backend API documentation
+
+## Best Practices
+
+1. Always use environment variables for configuration
+2. Never commit .env files to git
+3. Use .env.template as documentation
+4. Run integration tests after deployment
+5. Monitor service status regularly
+6. Set appropriate timeouts for production
+7. Use different configurations for dev/prod
+
+## API Endpoints Tested
+
+The integration verifier tests these endpoints:
+- /api/v1/health - Health check
+- /api/v1/kpi/overview - KPI overview
+- /api/v1/kpi/category - KPI by category
+- /api/v1/products/performance - Product performance
+- /api/v1/products/kpi - Product KPI
+- /api/v1/sales/summary - Sales summary
+- /api/v1/revenue - Revenue data
+- /api/v1/customers - Customer data
+- /api/v1/dashboard/metrics - Dashboard metrics
+- /api/v1/reports - Reports list
+- /api/v1/reports/sales - Report data
+- /api/v1/anomalies - Anomaly detection
+- /api/v1/reports/top-performers - Top performers
+
+## Support
+
+For issues or questions:
+1. Check Service Status page
+2. Review error messages in detail
+3. Check backend API logs
+4. Verify configuration settings
+5. Run integration tests for diagnosis
