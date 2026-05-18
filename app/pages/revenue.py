@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from components.filters import render_date_range_filter, get_filter_summary, render_comparison_filter
+from components.help import display_help_modal, HelpContent, create_help_sidebar
 
 # Page configuration
 st.set_page_config(
@@ -18,6 +19,9 @@ st.set_page_config(
 # Page title
 st.title("💰 Revenue Analytics")
 st.markdown("---")
+
+# Add help modal
+display_help_modal(HelpContent.REVENUE_HELP, key="revenue_help")
 
 # Render filters in sidebar
 with st.sidebar:

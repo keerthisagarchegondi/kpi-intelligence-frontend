@@ -35,6 +35,7 @@ from components.tables import (
 )
 
 from components.filters import render_date_range_filter
+from components.help import display_help_modal, HelpContent, create_help_sidebar
 
 # Import loading and error components
 from components.loading import (
@@ -124,6 +125,9 @@ st.markdown("""
 # Page header
 st.markdown('<h1 class="main-header">📋 KPI Reports & Data Tables</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Comprehensive business intelligence reports with advanced analytics</p>', unsafe_allow_html=True)
+
+# Add help modal
+display_help_modal(HelpContent.REPORTS_HELP, key="reports_help")
 
 # Connection status
 display_connection_status()

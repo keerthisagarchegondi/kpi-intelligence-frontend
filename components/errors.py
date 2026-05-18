@@ -307,6 +307,50 @@ def show_error_message(
         collapsible: Whether to make details collapsible
     """
     
+    # Enhanced CSS styling for better visual polish
+    st.markdown("""
+    <style>
+        .error-card {
+            padding: 1.25rem;
+            border-radius: 8px;
+            border-left: 4px solid;
+            margin: 1rem 0;
+            animation: slideIn 0.3s ease-out;
+        }
+        .error-card.info {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+            color: #0d47a1;
+        }
+        .error-card.warning {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+            color: #e65100;
+        }
+        .error-card.error {
+            background-color: #ffebee;
+            border-color: #f44336;
+            color: #b71c1c;
+        }
+        .error-card.critical {
+            background-color: #fce4ec;
+            border-color: #e91e63;
+            color: #880e4f;
+            font-weight: 600;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Choose display method based on severity
     if error_msg.severity == ErrorSeverity.INFO:
         st.info(f"ℹ️ {error_msg.message}")

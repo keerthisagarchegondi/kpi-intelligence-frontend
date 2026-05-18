@@ -41,7 +41,25 @@ def render_date_range_filter(
     
     # Create filter container with styling
     with st.container():
-        st.markdown("### 📅 Date Range Filter")
+        st.markdown("""
+        <style>
+            .filter-container {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                padding: 1.5rem;
+                border-radius: 10px;
+                margin-bottom: 1.5rem;
+            }
+            .filter-title {
+                color: #1f77b4;
+                font-weight: 600;
+                font-size: 1.2rem;
+                margin-bottom: 1rem;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('<div class="filter-container">', unsafe_allow_html=True)
+        st.markdown('<div class="filter-title">📅 Date Range Filter</div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns([2, 1])
         
@@ -122,6 +140,7 @@ def render_date_range_filter(
             filters_applied = True
         
         st.markdown("---")
+        st.markdown('</div>', unsafe_allow_html=True)
     
     return start_datetime, end_datetime, filters_applied
 

@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from components.filters import render_date_range_filter, get_filter_summary
+from components.help import display_help_modal, HelpContent, create_help_sidebar
 from components.charts import (
     create_revenue_trend_chart,
     create_revenue_breakdown_chart,
@@ -96,6 +97,9 @@ st.markdown("""
 # Dashboard header
 st.markdown('<h1 class="main-header">📊 Business Intelligence Dashboard</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Comprehensive view of key performance indicators and revenue metrics</p>', unsafe_allow_html=True)
+
+# Add help modal
+display_help_modal(HelpContent.DASHBOARD_HELP, key="dashboard_help")
 
 # Render date range filter
 with st.expander("🔧 Filters & Date Range", expanded=False):

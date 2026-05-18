@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from components.filters import render_date_range_filter, get_filter_summary
+from components.help import display_help_modal, HelpContent, create_help_sidebar
 from components.charts import (
     create_cohort_retention_heatmap,
     create_retention_trend_chart,
@@ -80,6 +81,10 @@ st.markdown("""
 # Page header
 st.markdown('<h1 class="retention-header">🔄 Customer Retention & Churn Analysis</h1>', unsafe_allow_html=True)
 st.markdown('<p style="font-size: 1.1rem; color: #666; margin-bottom: 2rem;">Analyze retention trends, identify churn risks, and optimize customer lifetime value</p>', unsafe_allow_html=True)
+
+# Add help modal
+display_help_modal(HelpContent.RETENTION_HELP, key="retention_help")
+
 st.markdown("---")
 
 # Render filters
