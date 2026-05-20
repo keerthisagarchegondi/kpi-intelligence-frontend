@@ -9,6 +9,17 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from components.filters import render_date_range_filter, get_filter_summary, render_comparison_filter
 from components.help import display_help_modal, HelpContent, create_help_sidebar
 
+# Import API service
+from services.api import (
+    fetch_kpi_by_category,
+    fetch_kpi_time_series,
+    fetch_report_data,
+    fetch_sales_summary,
+    display_connection_status,
+    load_data_with_fallback,
+    APIStatus
+)
+
 # Page configuration
 st.set_page_config(
     page_title="Revenue Analytics - KPI Intelligence",
@@ -22,6 +33,9 @@ st.markdown("---")
 
 # Add help modal
 display_help_modal(HelpContent.REVENUE_HELP, key="revenue_help")
+
+# Display backend connection status
+display_connection_status()
 
 # Render filters in sidebar
 with st.sidebar:
@@ -51,6 +65,49 @@ if filters_applied:
     
     st.markdown("---")
     
+    # Fetch revenue data from API
+    with st.spinner("Loading revenue metrics..."):
+        # Convert dates to string format for API
+        start_date_str = start_date.strftime('%Y-%m-%d')
+        end_date_str = end_date.strftime('%Y-%m-%d')
+        
+        # Fetch revenue KPIs
+        revenue_data, status, error = fetch_kpi_by_category(
+            category='revenue',
+            start_date=start_date_str,
+            end_date=end_date_str,
+            use_cache=True
+        )
+        
+        # Fetch sales summary for transaction data
+        sales_data, sales_status, sales_error = fetch_sales_summary(
+            start_date=start_date_str,
+            end_date=end_date_str,
+            use_cache=True
+        )
+        
+        # Use fetched data or fallback to defaults
+        if revenue_data:
+            total_revenue = revenue_data.get('total_revenue', 482350)
+            revenue_growth = revenue_data.get('growth_rate', 15.3)
+            avg_revenue = revenue_data.get('average_revenue', 142.50)
+            avg_growth = revenue_data.get('avg_growth', 8.7)
+        else:
+            # Fallback values
+            total_revenue = 482350
+            revenue_growth = 15.3
+            avg_revenue = 142.50
+            avg_growth = 8.7
+            if status != APIStatus.SUCCESS:
+                st.warning(f"⚠️ Using sample revenue data. {error or 'Backend unavailable.'}")
+        
+        if sales_data:
+            total_transactions = sales_data.get('total_transactions', 3384)
+            transaction_growth = sales_data.get('transaction_growth', 12.4)
+        else:
+            total_transactions = 3384
+            transaction_growth = 12.4
+    
     # Revenue metrics
     st.subheader("💵 Key Revenue Metrics")
     
@@ -59,23 +116,23 @@ if filters_applied:
     with col1:
         st.metric(
             label="Total Revenue",
-            value="$482,350",
-            delta="+15.3%",
+            value=f"${total_revenue:,.0f}",
+            delta=f"+{revenue_growth:.1f}%",
             help="Total revenue for selected period"
         )
     
     with col2:
         st.metric(
             label="Average Revenue Per User",
-            value="$142.50",
-            delta="+8.7%",
+            value=f"${avg_revenue:.2f}",
+            delta=f"+{avg_growth:.1f}%",
             help="Average revenue per active user"
         )
     
     with col3:
         st.metric(
             label="Revenue Growth Rate",
-            value="15.3%",
+            value=f"{revenue_growth:.1f}%",
             delta="+2.1%",
             help="Month-over-month revenue growth"
         )
@@ -83,12 +140,18 @@ if filters_applied:
     with col4:
         st.metric(
             label="Total Transactions",
-            value="3,384",
-            delta="+12.4%",
+            value=f"{total_transactions:,}",
+            delta=f"+{transaction_growth:.1f}%",
             help="Number of transactions in period"
         )
     
     st.markdown("---")
+    
+    # Data status note
+    if status == APIStatus.SUCCESS:
+        st.success("✅ Displaying live revenue data from API")
+    else:
+        st.info("ℹ️ Using sample data. Connect backend for live metrics and detailed breakdowns.")
     
     # Revenue analysis tabs for organized view
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -102,6 +165,8 @@ if filters_applied:
     # Tab 1: Revenue Breakdown
     with tab1:
         st.subheader("Revenue Distribution")
+        
+        st.info("📊 **Note:** Detailed revenue breakdown charts require additional API endpoints. Key metrics are displayed above with live data when backend is connected.")
         
         col_chart1, col_chart2 = st.columns(2)
         
