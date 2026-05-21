@@ -102,6 +102,9 @@ class APIClient:
         Returns:
             Cached data or None if expired/not found
         """
+        if 'api_cache' not in st.session_state:
+            st.session_state.api_cache = {}
+        
         if cache_key in st.session_state.api_cache:
             cached_data, timestamp = st.session_state.api_cache[cache_key]
             if (datetime.now() - timestamp).seconds < APIConfig.CACHE_TTL:
@@ -110,6 +113,8 @@ class APIClient:
     
     def _save_to_cache(self, cache_key: str, data: Dict):
         """Save data to cache with timestamp"""
+        if 'api_cache' not in st.session_state:
+            st.session_state.api_cache = {}
         st.session_state.api_cache[cache_key] = (data, datetime.now())
     
     def _make_request(
@@ -265,7 +270,10 @@ class APIClient:
     
     def clear_cache(self):
         """Clear all cached API responses"""
-        st.session_state.api_cache = {}
+        if 'api_cache' not in st.session_state:
+            st.session_state.api_cache = {}
+        else:
+            st.session_state.api_cache = {}
 
 
 # Global API client instance
@@ -438,7 +446,6 @@ def fetch_revenue_data(
     use_cache: bool = True,
     show_errors: bool = False
 ) -> Tuple[Optional[pd.DataFrame], str]:
-) -> Optional[pd.DataFrame]:
     """
     Fetch revenue time-series data.
     

@@ -79,6 +79,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Load modern CSS enhancements
+try:
+    with open(Path(__file__).parent.parent / 'assets' / 'modern-ui.css') as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+except FileNotFoundError:
+    pass  # Modern CSS is optional
+
 st.markdown('<h1 class="main-title">📊 Business KPI Intelligence & Reporting System</h1>', unsafe_allow_html=True)
 st.markdown("---")
 

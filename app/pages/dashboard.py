@@ -161,39 +161,36 @@ with upload_col:
     if result:
         if result.get('status') == 'success':
             st.success(f"✅ {result['message']}")
-                            
-                            # Display upload details
-                            file_info = result.get('file_info', {})
-                            st.info(
-                                f"📁 **File:** {file_info.get('filename', 'N/A')}  \n"
-                                f"📊 **Size:** {file_info.get('file_size_mb', 0):.2f} MB  \n"
-                                f"📋 **Rows:** {file_info.get('rows', 0):,}  \n"
-                                f"📏 **Columns:** {file_info.get('columns', 0)}  \n"
-                                f"⏱️ **Processing Time:** {result.get('processing_time_seconds', 0):.2f}s"
-                            )
-                            
-                            # Show validation results if any
-                            validation = result.get('validation_results', {})
-                            if validation:
-                                if validation.get('has_errors'):
-                                    st.error(f"❌ Validation Errors: {', '.join(validation.get('errors', []))}")
-                                elif validation.get('has_warnings'):
-                                    st.warning(f"⚠️ Warnings: {', '.join(validation.get('warnings', []))}")
-                                else:
-                                    st.success("✅ All validations passed!")
-                            
-                            # Show processing summary
-                            if process_data and 'processing_summary' in result:
-                                summary = result['processing_summary']
-                                if summary and 'actions' in summary:
-                                    with st.expander("🔧 Processing Actions", expanded=False):
-                                        for action in summary['actions']:
-                                            st.text(f"• {action}")
-                        else:
-                            st.error("❌ Upload failed. Please check the file and try again.")
-                    
-                    except Exception as e:
-                        st.error(f"❌ Upload error: {str(e)}")
+            
+            # Display upload details
+            file_info = result.get('file_info', {})
+            st.info(
+                f"📁 **File:** {file_info.get('filename', 'N/A')}  \n"
+                f"📊 **Size:** {file_info.get('file_size_mb', 0):.2f} MB  \n"
+                f"📋 **Rows:** {file_info.get('rows', 0):,}  \n"
+                f"📏 **Columns:** {file_info.get('columns', 0)}  \n"
+                f"⏱️ **Processing Time:** {result.get('processing_time_seconds', 0):.2f}s"
+            )
+            
+            # Show validation results if any
+            validation = result.get('validation_results', {})
+            if validation:
+                if validation.get('has_errors'):
+                    st.error(f"❌ Validation Errors: {', '.join(validation.get('errors', []))}")
+                elif validation.get('has_warnings'):
+                    st.warning(f"⚠️ Warnings: {', '.join(validation.get('warnings', []))}")
+                else:
+                    st.success("✅ All validations passed!")
+            
+            # Show processing summary
+            if process_data and 'processing_summary' in result:
+                summary = result['processing_summary']
+                if summary and 'actions' in summary:
+                    with st.expander("🔧 Processing Actions", expanded=False):
+                        for action in summary['actions']:
+                            st.text(f"• {action}")
+        else:
+            st.error("❌ Upload failed. Please check the file and try again.")
 
 st.markdown("---")
 
