@@ -115,9 +115,17 @@ class UploadValidator:
         if len(filename) > 255:
             return False, "Filename is too long (max 255 characters)"
         
-        # Check for valid characters only
-        if not re.match(r'^[a-zA-Z0-9._\-\s]+$', filename):
-            return False, "Filename contains invalid characters. Use only letters, numbers, spaces, dots, hyphens, and underscores"
+        # Reject filesystem-reserved characters while allowing common filename punctuation
+        # and Unicode letters/numbers (e.g., parentheses, commas, apostrophes).
+        if re.search(r'[<>:"/\\|?*]', filename):
+            return False, (
+                "Filename contains invalid characters. "
+                "Do not use: < > : \" / \\ | ? *"
+            )
+
+        # Windows compatibility: names cannot end in a dot or space.
+        if filename.endswith(' ') or filename.endswith('.'):
+            return False, "Filename cannot end with a space or dot"
         
         return True, None
     

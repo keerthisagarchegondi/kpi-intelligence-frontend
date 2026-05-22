@@ -183,7 +183,7 @@ with upload_col:
                     st.success("✅ All validations passed!")
             
             # Show processing summary
-            if process_data and 'processing_summary' in result:
+            if 'processing_summary' in result:
                 summary = result['processing_summary']
                 if summary and 'actions' in summary:
                     with st.expander("🔧 Processing Actions", expanded=False):

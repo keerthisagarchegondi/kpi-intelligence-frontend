@@ -383,7 +383,7 @@ def fetch_sales_summary(
     end_date: Optional[str] = None,
     use_cache: bool = True,
     show_errors: bool = False
-) -> Tuple[Optional[Dict], str]:
+) -> Tuple[Optional[Dict], str, Optional[str]]:
     """
     Fetch sales summary data.
     
@@ -394,7 +394,7 @@ def fetch_sales_summary(
         show_errors: Whether to display errors in UI
     
     Returns:
-        Tuple of (Dictionary with sales summary or None, status)
+        Tuple of (Dictionary with sales summary or None, status, error_message)
     """
     params = {}
     if start_date:
@@ -410,9 +410,9 @@ def fetch_sales_summary(
     )
     
     if response and response.get('status') == 'success':
-        return response['data'], status
+        return response['data'], status, None
     
-    return None, status
+    return None, status, error_msg
 
 
 def fetch_dashboard_metrics(
@@ -599,7 +599,12 @@ def fetch_anomalies(
         "limit": limit
     }
     
-    return api_client.get("/anomalies/detect", params=params, use_cache=use_cache)
+    response, status, error_msg = api_client.get("/anomalies/detect", params=params, use_cache=use_cache)
+    
+    if response and status == APIStatus.SUCCESS:
+        return response
+    
+    return None
 
 
 # ==================== FILE UPLOAD ====================
@@ -715,7 +720,7 @@ def fetch_kpi_by_category(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     use_cache: bool = True
-) -> Optional[Dict[str, Any]]:
+) -> Tuple[Optional[Dict[str, Any]], str, Optional[str]]:
     """
     Fetch KPIs filtered by specific category.
     
@@ -726,7 +731,7 @@ def fetch_kpi_by_category(
         use_cache: Use cached data if available
     
     Returns:
-        Dictionary with category-specific KPI metrics
+        Tuple of (category-specific KPI metrics or None, status, error_message)
     """
     params = {'category': category}
     if start_date:
@@ -734,12 +739,16 @@ def fetch_kpi_by_category(
     if end_date:
         params['end_date'] = end_date
     
-    response = api_client.get(f"kpi/category/{category}", params=params, use_cache=use_cache)
+    response, status, error_msg = api_client.get(
+        f"kpi/category/{category}",
+        params=params,
+        use_cache=use_cache
+    )
     
     if response and response.get('status') == 'success':
-        return response['data']
+        return response['data'], status, None
     
-    return None
+    return None, status, error_msg
 
 
 def fetch_kpi_time_series(
